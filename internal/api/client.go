@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	stdjson "encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -175,15 +174,27 @@ func ParseResponse(resp *http.Response) (any, error) {
 		return nil, nil
 	}
 
-	// Decode numbers without rounding before deciding their in-memory type.
-	decoder := stdjson.NewDecoder(bytes.NewReader(body))
-	decoder.UseNumber()
-	var result any
-	if err := decoder.Decode(&result); err != nil {
-		// Not JSON — return as string
+	// Validate the full document: the fast decoder accepts malformed numbers
+	// and some control characters that the JSON grammar forbids.
+	if !stdjson.Valid(body) {
 		return string(body), nil
 	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+	var result any
+	if !responseNeedsNumber(body) {
+		// Ordinary responses keep the existing fast decoder and float64 types.
+		if err := json.Unmarshal(body, &result); err == nil {
+			return result, nil
+		}
+	}
+	// Use the standard decoder for loss-sensitive numbers, including exponents
+	// outside float64's range (which the fast UseNumber decoder also rejects).
+	decoder := stdjson.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := decoder.Decode(&result); err != nil {
+		return string(body), nil
+	}
+
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
 		return string(body), nil
 	}
 	return normalizeResponseNumbers(result), nil

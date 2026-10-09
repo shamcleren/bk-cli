@@ -152,7 +152,7 @@ func runQuery(cmd *cobra.Command, kind string, o *queryFlags, deps systemcmd.Bui
 	}
 	data, queryErr := queryData(env, runtime, spec.Headers)
 	env.Data = data
-	if queryErr == nil || isPartial(data) {
+	if queryErr == nil || data != nil {
 		if err := env.WriteJSON(cmd.OutOrStdout()); err != nil {
 			return err
 		}
@@ -326,7 +326,6 @@ func queryData(env *output.Envelope, runtime *syslib.Runtime, headers []string) 
 		return nil, fmt.Errorf("server returned invalid query JSON object")
 	}
 	secrets := responseSecrets(runtime, headers)
-	redactQueryStrings(obj, secrets)
 	for name, value := range env.Headers {
 		if strings.EqualFold(name, "X-Bkapi-Authorization") {
 			env.Headers[name] = "[REDACTED]"
@@ -350,7 +349,11 @@ func queryData(env *output.Envelope, runtime *syslib.Runtime, headers []string) 
 			return nil, fmt.Errorf("query rejected by Unify Query")
 		}
 	}
-	if isPartial(obj) {
+	// Interpret gateway and UQ control fields before redacting payload keys.
+	// A credential can itself equal a protocol key such as "data" or "code".
+	partial := isPartial(obj)
+	redactQueryStrings(obj, secrets)
+	if partial {
 		return obj, fmt.Errorf("partial query result; inspect stdout data.status")
 	}
 	return obj, nil
@@ -380,17 +383,21 @@ func responseSecrets(runtime *syslib.Runtime, headers []string) []string {
 	}
 	parsed, _ := api.ParseHeaderFlags(headers)
 	for name, value := range parsed {
-		if strings.EqualFold(name, "X-Bk-Scope-Space-Uid") || strings.EqualFold(name, "Content-Type") ||
-			strings.EqualFold(name, "Accept") || strings.EqualFold(name, "User-Agent") {
-			continue
+		if strings.EqualFold(name, "Authorization") || strings.EqualFold(name, "Proxy-Authorization") {
+			values = append(values, value)
+			_, token, _ := strings.Cut(value, " ")
+			values = append(values, token)
 		}
-		values = append(values, value)
 		if strings.EqualFold(name, "X-Bkapi-Authorization") {
-			var auth map[string]string
+			values = append(values, value)
+			var auth map[string]any
 			if json.Unmarshal([]byte(value), &auth) == nil {
 				for key, field := range auth {
-					if key != "bk_app_code" && key != "bk_username" {
-						values = append(values, field)
+					switch key {
+					case "bk_app_secret", "bk_token", "bk_ticket", "access_token":
+						if secret, ok := field.(string); ok {
+							values = append(values, secret)
+						}
 					}
 				}
 			}
