@@ -5,7 +5,7 @@ description: 通过 bk-cli monitor 只读查询蓝鲸日志、Trace、结构化�
 
 # 蓝鲸可观测查询
 
-先阅读 [共享使用规则](../bk-cli-shared/SKILL.md)。本系统的配置、查询与迁移细节见 [monitor 使用指南](../../docs/monitor.md)。
+先阅读 [共享使用规则](../bk-cli-shared/SKILL.md)。本系统的配置与查询细节见 [monitor 使用指南](../../docs/monitor.md)。
 
 ## 前置条件
 
@@ -14,7 +14,8 @@ description: 通过 bk-cli monitor 只读查询蓝鲸日志、Trace、结构化�
 - 项目提供环境资源 JSON，描述日志/Trace 表、查询空间与 metrics namespace。
 
 不要向用户索取 secret、token 或 ticket，也不要读取凭据文件。认证由用户在本机完成。
-bk-cli 当前的应用登录模式需要用户 token/ticket；仅 app code + secret 的原 bkm 登录流程仍由 bkm 处理。
+bk-cli 当前的应用登录模式需要用户 token/ticket，也可使用独立 access token。
+默认项目资源配置为 `~/.bk-cli/monitor.json`；可通过 `--config` 或 `BK_CLI_MONITOR_CONFIG` 指定。
 
 ## 查询流程
 
@@ -43,6 +44,6 @@ metrics 会校验 namespace，包括完整 JSON 请求。原生 PromQL 只替换
 - `monitor status` 默认检查全部配置环境；`--env` 限定检查范围。
 - status 的 `empty` 表示请求成功但窗口内没有数据；它不能证明采集正常。
 - `status --local` 只展示本地状态，不验证凭据内容或网关权限。
-- 新入口的输出、认证和退出码遵循 bk-cli。依赖 bkm 原协议的脚本继续使用 bkm。
+- 输出、认证和退出码遵循 bk-cli 的统一契约。
 
 若任务变为开发或扩展本系统，转而阅读仓库 `AGENTS.md`、`docs/design.md` 和 `.agents/skills/create-bk-cli-system/SKILL.md`。

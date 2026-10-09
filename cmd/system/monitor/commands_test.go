@@ -48,7 +48,7 @@ var _ = Describe("monitor commands", func() {
 		dir, err := os.MkdirTemp("", "bk-cli-monitor-*")
 		Expect(err).NotTo(HaveOccurred())
 		DeferCleanup(os.RemoveAll, dir)
-		for _, name := range []string{"BK_CLI_CONFIG_DIR", "BKM_CONFIG", "BK_CLI_MONITOR_CONFIG", "BKM_ENV", "BKM_SPACE_UID"} {
+		for _, name := range []string{"BK_CLI_CONFIG_DIR", "BK_CLI_MONITOR_CONFIG", "BK_CLI_MONITOR_ENV", "BK_CLI_MONITOR_SPACE_UID"} {
 			old, exists := os.LookupEnv(name)
 			DeferCleanup(func() {
 				if exists {
@@ -74,6 +74,27 @@ var _ = Describe("monitor commands", func() {
 		err := cmd.Execute()
 		return out.String(), err
 	}
+
+	It("loads monitor profiles from the bk-cli config directory by default", func() {
+		Expect(configPath()).To(Equal(path))
+		cmd := newEnvsCmd(systemtest.BuildDeps(false))
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		cmd.SetArgs([]string{})
+		Expect(cmd.Execute()).To(Succeed())
+		Expect(out.String()).To(ContainSubstring(`"default_env": "dev"`))
+		Expect(out.String()).To(ContainSubstring(`"prod"`))
+	})
+
+	It("prefers explicit config over the monitor config environment variable", func() {
+		other := filepath.Join(filepath.Dir(path), "other.json")
+		Expect(os.WriteFile(other, []byte(`{"default_env":"other"}`), 0o600)).To(Succeed())
+		Expect(os.Setenv("BK_CLI_MONITOR_CONFIG", other)).To(Succeed())
+		Expect(configPath()).To(Equal(other))
+		out, err := run(newEnvsCmd(systemtest.BuildDeps(false)))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(out).To(ContainSubstring(`"default_env": "dev"`))
+	})
 
 	preview := func(kind string, args ...string) map[string]any {
 		out, err := run(newQueryCmd(kind, systemtest.BuildDeps(true)), args...)
@@ -195,8 +216,8 @@ var _ = Describe("monitor commands", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
-	It("honors explicit env over BKM_ENV and root gateway paths", func() {
-		Expect(os.Setenv("BKM_ENV", "prod")).To(Succeed())
+	It("honors explicit env over BK_CLI_MONITOR_ENV and root gateway paths", func() {
+		Expect(os.Setenv("BK_CLI_MONITOR_ENV", "prod")).To(Succeed())
 		request := preview(
 			"query",
 			"--env",
@@ -210,7 +231,7 @@ var _ = Describe("monitor commands", func() {
 		Expect(request["url"]).To(ContainSubstring("/testing/query/promql"))
 	})
 
-	It("validates a legacy gateway URL against context and supports proxy routing", func() {
+	It("validates a configured gateway URL against context and supports proxy routing", func() {
 		cfg := `{"space_uid":"s","log_table_id":"logs","apigw":{"base_url":"https://bkapi.example.com/api/bk-unify-query/prod","proxy_path":"/proxy"}}`
 		Expect(os.WriteFile(path, []byte(cfg), 0o600)).To(Succeed())
 		request := preview("logs")
@@ -334,7 +355,7 @@ var _ = Describe("monitor commands", func() {
 		}))
 		DeferCleanup(server.Close)
 		Expect(systemtest.SetupTestContext(server.URL)).To(Succeed())
-		Expect(os.Setenv("BKM_ENV", "dev")).To(Succeed())
+		Expect(os.Setenv("BK_CLI_MONITOR_ENV", "dev")).To(Succeed())
 		out, err := run(newStatusCmd(systemtest.BuildDeps(false)))
 		Expect(err).To(HaveOccurred())
 		Expect(calls).To(Equal(10))

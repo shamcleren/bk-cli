@@ -24,7 +24,7 @@ bk-cli auth check
 
 使用实际部署地址替换示例。内网部署可以使用 `bk_ticket`，也可以使用独立 `access_token`。
 当前 `auth login` 的应用凭据模式要求同时提供用户 token/ticket，不能只保存 app code + secret。
-monitor 不读取 bkm 的 `credentials.json` 或 `BKM_APP_CODE`、`BKM_APP_SECRET`，不会另建认证存储。
+monitor 使用当前 context 的统一认证存储。
 `auth check` 检查本机凭据；`monitor status` 通过实际查询检查资源权限与响应。
 
 ## 项目资源配置
@@ -56,16 +56,17 @@ context 描述 BlueKing 部署；`--env` 描述项目的查询资源映射；`--
 ```
 
 替换 `YOUR_*` 占位符。未配置专属空间时，日志和指标使用 `space_uid`。
-配置文件优先级：`--config` > `BK_CLI_MONITOR_CONFIG` > `BKM_CONFIG` > `~/.config/bkm/config.json`。
+配置文件优先级：`--config` > `BK_CLI_MONITOR_CONFIG` > `~/.bk-cli/monitor.json`。
+设置 `BK_CLI_CONFIG_DIR` 后，默认文件改为该目录下的 `monitor.json`。直接编辑文件中的 `environments` 即可维护环境映射。
 默认文件不存在时，可直接通过 `--space-uid` 和 `--table` 指定资源；显式配置文件必须存在。
-环境优先级：`--env` > `BKM_ENV` > `default_env`；空间优先级：`--space-uid` > `BKM_SPACE_UID` > 环境映射。
+环境优先级：`--env` > `BK_CLI_MONITOR_ENV` > `default_env`；空间优先级：`--space-uid` > `BK_CLI_MONITOR_SPACE_UID` > 环境映射。
 `monitor envs` 展示资源映射，不展示凭据。
 
 默认网关名为 `bk-unify-query`，默认 stage 为 `prod`，资源路径如上。
 环境内的 `apigw` 整体覆盖顶层 `apigw`；`--stage` 可覆盖配置 stage。
-如保留旧 bkm 配置的 `apigw.base_url`，它必须匹配当前 context 渲染出的网关地址，不能绕过 context。
+如配置 `apigw.base_url`，它必须匹配当前 context 渲染出的网关地址，不能绕过 context。
 自定义网关需要填写 `gateway_name`。`proxy_path` 可使用 `{ "path": "UQ内部路径", "data": {...} }` 协议。
-没有 API Gateway 的历史直连配置继续由原 bkm 使用；monitor 始终走 bk-cli 的网关调用路径。
+monitor 始终走 bk-cli 的网关调用路径。
 
 ## 查询规则
 
@@ -96,11 +97,10 @@ stdout 使用 bk-cli envelope，UQ 查询结果位于 `data`；APIGW 的 `result
 `--dry-run` 采用共享的 `dry_run/request` 结构并脱敏鉴权头。
 HTTP 错误、网关拒绝、UQ 内层错误返回非零退出码；`is_partial:true` 或非空 `status.code` 保留 stdout 数据，同时返回系统错误（退出码 2）。
 输入错误使用退出码 1。共享响应解析器保留 JSON number 的原始数值字面量，嵌套对象和数组中的超大整数也不会经过浮点数转换，输出仍为 JSON 数值。
-依赖原始 JSON 输出或原退出码语义的脚本应继续使用 bkm。
 
 ## 资源检查
 
-`monitor status`（别名 `verify`）默认遍历所有配置环境，不受 `BKM_ENV` 或 `default_env` 限制；`--env` 仅检查指定环境。
+`monitor status`（别名 `verify`）默认遍历所有配置环境，不受 `BK_CLI_MONITOR_ENV` 或 `default_env` 限制；`--env` 仅检查指定环境。
 每个环境先验证 `vector(1)` 的实际返回值，再检查已配置日志源、Trace 表，以及 namespace 下的结构化指标和 PromQL。
 默认日志表与某个命名源重复时不重复检查；未配置的表不生成探针。
 
@@ -110,8 +110,5 @@ HTTP 错误、网关拒绝、UQ 内层错误返回非零退出码；`is_partial:
 `--local` 不联网，返回 `local_only:true`、`verified:false` 及凭据文件是否存在；它不验证文件内容，凭据有效性请使用 `auth check`。
 status 的 `--dry-run` 只预览第一跳请求，不执行在线验证。
 
-## 与独立 bkm 并存
 
-本系统不替换或依赖外部 bkm 二进制。原有 `bkm` 命令、认证、配置文件和脚本继续保留。
-新调用方使用 bk-cli 的统一契约；项目资源配置可复用，部署和凭据通过 `context/auth` 单独配置。
-本次扩展不增加告警、事件、仪表盘管理或通用元数据发现。
+本系统提供查询与资源检查，不包含告警、事件、仪表盘管理或通用元数据发现。

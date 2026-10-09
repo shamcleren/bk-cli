@@ -52,10 +52,10 @@ func newQueryCmd(kind string, deps systemcmd.BuildDeps) *cobra.Command {
 		&o.config,
 		"config",
 		configPath(),
-		"Monitor environment JSON (BK_CLI_MONITOR_CONFIG or BKM_CONFIG)",
+		"Monitor environment JSON (BK_CLI_MONITOR_CONFIG)",
 	)
-	cmd.Flags().StringVar(&o.environment, "env", "", "Project environment (BKM_ENV or default_env)")
-	cmd.Flags().StringVar(&o.space, "space-uid", "", "Override query space (BKM_SPACE_UID)")
+	cmd.Flags().StringVar(&o.environment, "env", "", "Project environment (BK_CLI_MONITOR_ENV or default_env)")
+	cmd.Flags().StringVar(&o.space, "space-uid", "", "Override query space (BK_CLI_MONITOR_SPACE_UID)")
 	cmd.Flags().StringVar(&o.input, "input", "", "Complete UQ JSON file, or - for stdin")
 	cmd.Flags().StringVar(&o.since, "since", "1h", "Lookback duration")
 	cmd.Flags().StringVar(&o.start, "start", "", "Start: Unix seconds or RFC3339")

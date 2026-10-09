@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/TencentBlueKing/bk-cli/internal/api"
+	"github.com/TencentBlueKing/bk-cli/internal/config"
 	syslib "github.com/TencentBlueKing/bk-cli/internal/system"
 )
 
@@ -54,23 +55,16 @@ type gateway struct {
 }
 
 func configPath() string {
-	for _, name := range []string{"BK_CLI_MONITOR_CONFIG", "BKM_CONFIG"} {
-		if path := os.Getenv(name); path != "" {
-			return path
-		}
+	if path := os.Getenv("BK_CLI_MONITOR_CONFIG"); path != "" {
+		return path
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "monitor.json"
-	}
-	return filepath.Join(home, ".config", "bkm", "config.json")
+	return filepath.Join(config.BaseDirectory(), "monitor.json")
 }
 
 func readProfiles(path string, required bool) (profile, error) {
 	var root profile
 	raw, err := os.ReadFile(path)
-	if os.IsNotExist(err) && !required && os.Getenv("BK_CLI_MONITOR_CONFIG") == "" &&
-		os.Getenv("BKM_CONFIG") == "" {
+	if os.IsNotExist(err) && !required && os.Getenv("BK_CLI_MONITOR_CONFIG") == "" {
 		return root, nil
 	}
 	if err != nil {
@@ -84,7 +78,7 @@ func readProfiles(path string, required bool) (profile, error) {
 
 func selectProfile(root profile, name string, defaults bool) (profile, error) {
 	if name == "" && defaults {
-		name = os.Getenv("BKM_ENV")
+		name = os.Getenv("BK_CLI_MONITOR_ENV")
 		if name == "" {
 			name = root.DefaultEnv
 		}
@@ -107,7 +101,7 @@ func (p profile) space(kind, override string) string {
 	if override != "" {
 		return override
 	}
-	if value := os.Getenv("BKM_SPACE_UID"); value != "" {
+	if value := os.Getenv("BK_CLI_MONITOR_SPACE_UID"); value != "" {
 		return value
 	}
 	if kind == "logs" && p.LogSpaceUID != "" {
@@ -145,7 +139,7 @@ func (p profile) request(runtime *syslib.Runtime, kind, stage string, explicitSt
 		}
 		g.ProxyPath = configured.ProxyPath
 		if configured.BaseURL != "" {
-			// Legacy bkm URLs may describe the deployment, but may never bypass context.
+			// Resource URLs must match the selected deployment context.
 			expected := strings.TrimRight(configured.BaseURL, "/")
 			if configured.Stage == "" {
 				g.Stage = expected[strings.LastIndex(expected, "/")+1:]
