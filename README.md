@@ -17,6 +17,7 @@
 - **环境自检**: 使用 `bk-cli doctor` 检查 context、凭据、URL 渲染和网关连通性
 - **自动化友好的输出**: 带 `ok` 字段的 JSON 信封、机器可读错误、可预测的退出码
 - **丰富的系统命令**: 内置多个 BlueKing system 子命令，也保留原始 `api` 调用作为兜底能力
+- **可观测查询**: `bk-cli monitor` 查询日志、Trace、结构化指标与 PromQL，支持项目环境映射和资源状态检查；详见 [使用指南](docs/monitor.md)
 - **内置 Agent Skills**: 可通过 `bk-cli skills list` 和 `bk-cli skills read <name>` 查看随当前版本打包的使用指引，`skills read --raw` 可输出原始 Markdown
 - **加密凭据存储**: 每个上下文使用 AES-256-GCM 加密
 - **单一二进制文件**: 无运行时依赖
