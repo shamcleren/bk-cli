@@ -16,7 +16,7 @@
  * to the current version of the project delivered to anyone in the future.
  */
 
-package monitor
+package api_test
 
 import (
 	"bytes"
@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/TencentBlueKing/bk-cli/internal/api"
 	"github.com/TencentBlueKing/bk-cli/internal/output"
 )
 
@@ -39,7 +40,7 @@ var _ = Describe("response number precision", func() {
 				StatusCode: status,
 				Body:       io.NopCloser(strings.NewReader(raw)),
 			}
-			data, err := parseQueryResponse(resp)
+			data, err := api.ParseResponse(resp)
 			Expect(err).NotTo(HaveOccurred())
 			env := output.APIResponse(status, nil, data)
 			Expect(env.OK).To(Equal(status >= 200 && status < 300))
@@ -63,12 +64,32 @@ var _ = Describe("response number precision", func() {
 
 	DescribeTable("keeps malformed and trailing response bodies as text",
 		func(raw string) {
-			value, err := parseQueryResponse(&http.Response{Body: io.NopCloser(strings.NewReader(raw))})
+			value, err := api.ParseResponse(&http.Response{Body: io.NopCloser(strings.NewReader(raw))})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(value).To(Equal(raw))
 		},
 		Entry("two objects", `{"id":1}{"id":2}`),
 		Entry("trailing text", `{"id":9007199254740993} broken`),
 		Entry("invalid number", `{"id":01}`),
+	)
+	DescribeTable("keeps ordinary numeric types and preserves unsafe numbers", func(raw string, expected any) {
+		value, err := api.ParseResponse(&http.Response{Body: io.NopCloser(strings.NewReader(raw))})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(value).To(Equal(expected))
+	},
+		Entry("small integer", "42", float64(42)),
+		Entry("safe upper boundary", "9007199254740991", float64(9007199254740991)),
+		Entry("safe lower boundary", "-9007199254740991", float64(-9007199254740991)),
+		Entry("unsafe upper boundary", "9007199254740992", json.Number("9007199254740992")),
+		Entry("unsafe lower boundary", "-9007199254740992", json.Number("-9007199254740992")),
+		Entry("decimal integer", "2.0", float64(2)),
+		Entry("exponent integer", "2e0", float64(2)),
+		Entry("ordinary decimal", "0.1", float64(0.1)),
+		Entry("ordinary exponent", "1e-7", float64(1e-7)),
+		Entry("decimal precision", "0.10000000000000001", json.Number("0.10000000000000001")),
+		Entry("large exponent integer", "9.007199254740993e15", json.Number("9.007199254740993e15")),
+		Entry("float overflow", "1e1000", json.Number("1e1000")),
+		Entry("float underflow", "1e-1000000", json.Number("1e-1000000")),
+		Entry("zero exponent", "0e-1000000", float64(0)),
 	)
 })
