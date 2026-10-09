@@ -21,6 +21,8 @@ package api
 import (
 	"bytes"
 	"crypto/tls"
+	stdjson "encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -173,10 +175,16 @@ func ParseResponse(resp *http.Response) (any, error) {
 		return nil, nil
 	}
 
-	// Try to parse as JSON
+	// Preserve JSON number literals instead of rounding them through float64.
+	dec := stdjson.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
 	var result any
-	if err := json.Unmarshal(body, &result); err != nil {
+	if err := dec.Decode(&result); err != nil {
 		// Not JSON — return as string
+		return string(body), nil
+	}
+	// Match Unmarshal: the body must contain exactly one complete JSON value.
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return string(body), nil
 	}
 	return result, nil

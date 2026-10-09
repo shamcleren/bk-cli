@@ -126,7 +126,7 @@ def create_app(test_config: dict[str, Any] | None = None) -> Flask:
             "stage": stage,
         }
         if request.path.endswith("/raw"):
-            data = {"list": [{"message": "synthetic log"}], "trace_id": "query-trace", "echo": echo}
+            data = {"list": [{"message": "synthetic log", "id": 9007199254740993, "nested": [18446744073709551615, -9223372036854775809]}], "trace_id": "query-trace", "echo": echo}
         else:
             data = {
                 "series": [{"columns": ["_value"], "values": [[1]]}],

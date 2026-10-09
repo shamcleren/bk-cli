@@ -95,8 +95,8 @@ bk-cli monitor logs --config ./monitor.json --env dev --dry-run
 stdout 使用 bk-cli envelope，UQ 查询结果位于 `data`；APIGW 的 `result/data` 包装会被解开。
 `--dry-run` 采用共享的 `dry_run/request` 结构并脱敏鉴权头。
 HTTP 错误、网关拒绝、UQ 内层错误返回非零退出码；`is_partial:true` 或非空 `status.code` 保留 stdout 数据，同时返回系统错误（退出码 2）。
-输入错误使用退出码 1。响应中的数值遵循 bk-cli 共享解析器；当前共享解析器以浮点数解析 JSON number，超大整数响应不能保证精度。
-依赖原始响应大整数、原始 JSON 输出或原退出码语义的脚本应继续使用 bkm。
+输入错误使用退出码 1。共享响应解析器保留 JSON number 的原始数值字面量，嵌套对象和数组中的超大整数也不会经过浮点数转换，输出仍为 JSON 数值。
+依赖原始 JSON 输出或原退出码语义的脚本应继续使用 bkm。
 
 ## 资源检查
 

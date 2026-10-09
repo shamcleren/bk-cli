@@ -426,6 +426,8 @@ CLI 级错误输出到 stderr：
 - Go-implemented action 可以在同一个 envelope 里额外放入本地编排产生的 `data`，但 `dry_run` 与 `request` 字段的含义必须保持稳定。
 - 如果 Go-implemented action 会做多次上游调用编排，例如分页聚合，则 dry-run 至少要稳定展示第一跳请求，并可在 `data` 中补充分页或编排元数据。
 
+上游 JSON 响应中的数值必须以 `json.Number` 保留原始数值字面量，包括嵌套对象、数组和错误响应；输出时仍为 JSON number。需要数值运算的编排逻辑应显式转换并检查范围，禁止经 `float64` 中转导致整数精度丢失。非 JSON、空响应以及包含多段 JSON 的响应保持原有处理语义。
+
 ### 7.5 输入契约的一致性
 
 除了统一输出，bk-cli 还强调统一输入模式：

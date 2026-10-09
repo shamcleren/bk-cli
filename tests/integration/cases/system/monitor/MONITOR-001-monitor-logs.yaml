@@ -29,3 +29,7 @@ steps:
           equals: "logs"
         - path: data.echo.body.query_list.0.query_string
           equals: "ERROR"
+        - path: data.list.0.id
+          kind: number
+        - path: data.list.0.nested
+          length_at_least: 2

@@ -266,6 +266,31 @@ var _ = Describe("monitor commands", func() {
 		Expect(out).NotTo(ContainSubstring("token-123"))
 	})
 
+	It("preserves response integers through gateway unwrapping and redaction", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = io.WriteString(
+				w,
+				`{"result":true,"data":{"list":[{"id":9007199254740993,"nested":[18446744073709551615,-9223372036854775809],"message":"token-123"}]}}`,
+			)
+		}))
+		DeferCleanup(server.Close)
+		Expect(systemtest.SetupTestContext(server.URL)).To(Succeed())
+		out, err := run(newQueryCmd("logs", systemtest.BuildDeps(false)))
+		Expect(err).NotTo(HaveOccurred())
+		var env map[string]any
+		decoder := json.NewDecoder(strings.NewReader(out))
+		decoder.UseNumber()
+		Expect(decoder.Decode(&env)).To(Succeed())
+		row := env["data"].(map[string]any)["list"].([]any)[0].(map[string]any)
+		Expect(row["id"]).To(Equal(json.Number("9007199254740993")))
+		Expect(
+			row["nested"],
+		).To(
+			Equal([]any{json.Number("18446744073709551615"), json.Number("-9223372036854775809")}),
+		)
+		Expect(row["message"]).To(Equal("[REDACTED]"))
+	})
+
 	It("redacts overridden auth in response values, keys and gateway headers", func() {
 		const auth = `{"bk_app_code":"synthetic-app","bk_app_secret":"override-secret"}`
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

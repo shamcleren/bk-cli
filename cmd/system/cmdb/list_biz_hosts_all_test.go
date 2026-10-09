@@ -136,6 +136,30 @@ var _ = Describe("cmdb list_biz_hosts_all", func() {
 		}))
 	})
 
+	It("keeps adjacent large host IDs distinct during pagination", func() {
+		calls := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			calls++
+			if calls == 1 {
+				_, _ = io.WriteString(w, `{"count":2,"info":[{"bk_host_id":9007199254740992}]}`)
+			} else if calls == 2 {
+				_, _ = io.WriteString(w, `{"count":2,"info":[{"bk_host_id":9007199254740993}]}`)
+			} else {
+				_, _ = io.WriteString(w, `{"count":2,"info":[]}`)
+			}
+		}))
+		DeferCleanup(server.Close)
+		Expect(systemtest.SetupTestContext(server.URL)).To(Succeed())
+		cmd := newListBizHostsAllCmd(systemtest.BuildDeps(false))
+		Expect(cmd.Flags().Set("bk_biz_id", "2")).To(Succeed())
+		Expect(cmd.Flags().Set("page_limit", "1")).To(Succeed())
+		stdout, err := systemtest.CaptureCommandStdout(func() error { return cmd.RunE(cmd, nil) })
+		Expect(err).NotTo(HaveOccurred())
+		Expect(calls).To(Equal(3))
+		Expect(stdout).To(ContainSubstring(`"bk_host_id": 9007199254740992`))
+		Expect(stdout).To(ContainSubstring(`"bk_host_id": 9007199254740993`))
+	})
+
 	It("fails when a page adds no new hosts", func() {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			body, err := io.ReadAll(r.Body)
@@ -229,4 +253,15 @@ var _ = Describe("cmdb list_biz_hosts_all", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("missing numeric count"))
 	})
+	DescribeTable("rejects counts that cannot be used for pagination", func(value string) {
+		_, _, err := parsePagedInfoResponse("list_biz_hosts_all", map[string]any{
+			"count": json.Number(value), "info": []any{},
+		})
+		Expect(err).To(HaveOccurred())
+	}, Entry("fraction", "1.5"), Entry("negative", "-1"), Entry("overflow", "18446744073709551615"))
+
+	DescribeTable("rejects invalid JSON host IDs", func(value string) {
+		_, err := parseHostID("list_biz_hosts_all", map[string]any{"bk_host_id": json.Number(value)})
+		Expect(err).To(HaveOccurred())
+	}, Entry("fraction", "1.5"), Entry("overflow", "18446744073709551615"))
 })
