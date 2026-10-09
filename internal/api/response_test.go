@@ -20,9 +20,7 @@ package api_test
 
 import (
 	"bytes"
-	"io"
 	"net/http"
-	"strings"
 
 	json "github.com/goccy/go-json"
 	. "github.com/onsi/ginkgo/v2"
@@ -207,44 +205,4 @@ var _ = Describe("BuildDryRunEnvelope", func() {
 		Expect(out.String()).To(ContainSubstring(`"job_instance_id": 20004841045`))
 		Expect(out.String()).To(ContainSubstring(`"id": 20004841045`))
 	})
-})
-
-var _ = Describe("response number precision", func() {
-	DescribeTable(
-		"preserves nested and top-level JSON numbers through envelope output",
-		func(status int, raw string) {
-			env, err := api.BuildResponseEnvelope(&http.Response{
-				StatusCode: status,
-				Body:       io.NopCloser(strings.NewReader(raw)),
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(env.OK).To(Equal(status >= 200 && status < 300))
-			var out bytes.Buffer
-			Expect(env.WriteJSON(&out)).To(Succeed())
-			var emitted map[string]json.RawMessage
-			Expect(json.Unmarshal(out.Bytes(), &emitted)).To(Succeed())
-			var compact bytes.Buffer
-			Expect(json.Compact(&compact, emitted["data"])).To(Succeed())
-			Expect(compact.String()).To(Equal(raw))
-		},
-		Entry(
-			"nested success",
-			200,
-			`{"id":9007199254740993,"nested":{"values":[18446744073709551615,-9223372036854775809,0.123456789012345678901,1.234567890123456789e+100]}}`,
-		),
-		Entry("nested error", 502, `{"error":{"id":18446744073709551615,"values":[9007199254740993]}}`),
-		Entry("top-level integer", 200, `18446744073709551615`),
-		Entry("top-level array", 200, `[9007199254740993,-9223372036854775809,1.25]`),
-	)
-
-	DescribeTable("keeps malformed and trailing response bodies as text",
-		func(raw string) {
-			value, err := api.ParseResponse(&http.Response{Body: io.NopCloser(strings.NewReader(raw))})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(value).To(Equal(raw))
-		},
-		Entry("two objects", `{"id":1}{"id":2}`),
-		Entry("trailing text", `{"id":9007199254740993} broken`),
-		Entry("invalid number", `{"id":01}`),
-	)
 })

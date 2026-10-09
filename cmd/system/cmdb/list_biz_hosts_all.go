@@ -20,10 +20,8 @@ package cmdb
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
-	json "github.com/goccy/go-json"
 	"github.com/spf13/cobra"
 
 	"github.com/TencentBlueKing/bk-cli/internal/output"
@@ -305,17 +303,8 @@ func parsePagedInfoResponse(actionName string, data any) (int, []any, error) {
 		)
 	}
 
-	var count int
-	var countErr error
-	switch value := payload["count"].(type) {
-	case json.Number:
-		count, countErr = strconv.Atoi(value.String())
-	case float64:
-		count = int(value)
-	default:
-		countErr = fmt.Errorf("count is not numeric")
-	}
-	if countErr != nil || count < 0 {
+	count, ok := payload["count"].(float64)
+	if !ok {
 		return 0, nil, output.SystemError(
 			"response_error",
 			actionName+" response is missing numeric count",
@@ -332,7 +321,7 @@ func parsePagedInfoResponse(actionName string, data any) (int, []any, error) {
 		)
 	}
 
-	return count, info, nil
+	return int(count), info, nil
 }
 
 func appendUniqueHosts(
@@ -379,10 +368,6 @@ func parseHostID(actionName string, host any) (int64, error) {
 	}
 
 	switch hostID := rawHostID.(type) {
-	case json.Number:
-		if asInt, err := hostID.Int64(); err == nil {
-			return asInt, nil
-		}
 	case int:
 		return int64(hostID), nil
 	case int32:

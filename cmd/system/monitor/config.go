@@ -180,6 +180,7 @@ func (p profile) request(runtime *syslib.Runtime, kind, stage string, explicitSt
 	return syslib.RequestSpec{
 		GatewayName: g.Name, Stage: g.Stage, Method: "POST", Path: path,
 		BodyJSON: string(encoded), Headers: headers, Timeout: timeout,
-		AuthConfig: &syslib.AuthConfig{AppVerifiedRequired: true, ResourcePermissionRequired: true},
+		ResponseParser: parseQueryResponse,
+		AuthConfig:     &syslib.AuthConfig{AppVerifiedRequired: true, ResourcePermissionRequired: true},
 	}, nil
 }

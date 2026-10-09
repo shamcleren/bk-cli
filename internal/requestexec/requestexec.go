@@ -66,6 +66,9 @@ type RequestSpec struct {
 	Stage       string
 	Timeout     string
 	AuthConfig  api.AuthPolicy
+	// ResponseParser optionally decodes response data for this request only.
+	// Nil keeps the shared API parser and its existing numeric types.
+	ResponseParser func(*http.Response) (any, error)
 }
 
 // RequestResult contains the envelope produced by a single API request.
@@ -254,7 +257,16 @@ func executeRequest(runtime *Runtime, spec RequestSpec, timeoutErrorLabel string
 		logVerboseResponse(resp)
 	}
 
-	envelope, err := api.BuildResponseEnvelope(resp)
+	var envelope *output.Envelope
+	if spec.ResponseParser == nil {
+		envelope, err = api.BuildResponseEnvelope(resp)
+	} else {
+		var data any
+		data, err = spec.ResponseParser(resp)
+		if err == nil {
+			envelope = output.APIResponse(resp.StatusCode, api.ExtractGatewayHeaders(resp), data)
+		}
+	}
 	if err != nil {
 		return nil, output.SystemError("response_error", err.Error(), "")
 	}

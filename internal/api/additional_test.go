@@ -25,7 +25,6 @@ import (
 	"net/http/httptest"
 	"strings"
 
-	json "github.com/goccy/go-json"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -94,7 +93,7 @@ var _ = Describe("additional api coverage", func() {
 		jsonResp := &http.Response{Body: io.NopCloser(strings.NewReader(`{"value":1}`))}
 		parsed, err := api.ParseResponse(jsonResp)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(parsed).To(Equal(map[string]any{"value": json.Number("1")}))
+		Expect(parsed).To(Equal(map[string]any{"value": float64(1)}))
 
 		textResp := &http.Response{Body: io.NopCloser(strings.NewReader("plain-text"))}
 		parsed, err = api.ParseResponse(textResp)

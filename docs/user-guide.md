@@ -440,7 +440,7 @@ bk-cli api bk-demo GET /api/v2/foo/ \
 
 ### 1. 在脚本里使用
 
-`bk-cli` 默认输出结构化 JSON，这对脚本很友好。上游响应中的超大整数按原始数值输出，不会被 CLI 的浮点转换舍入；下游工具也需要支持精确整数解析。
+`bk-cli` 默认输出结构化 JSON，这对脚本很友好。
 
 ```
 # 先检查凭据，失败就退出
@@ -538,4 +538,4 @@ bk-cli api bk-apigateway GET /api/v2/open/gateways/{gateway_name}/resources/ \
 
 ## 可观测查询
 
-`bk-cli monitor` 提供只读日志、Trace、指标、PromQL 查询及按环境的资源检查。部署和凭证仍由 `context`、`auth` 管理，项目环境仅描述查询空间、表和 namespace。配置与迁移边界见 [monitor 使用指南](monitor.md)。
+`bk-cli monitor` 提供只读日志、Trace、指标、PromQL 查询及按环境的资源检查。部署和凭证仍由 `context`、`auth` 管理，项目环境仅描述查询空间、表和 namespace。配置与查询说明见 [monitor 使用指南](monitor.md)。

@@ -156,6 +156,57 @@ var _ = Describe("requestexec", func() {
 		})
 	})
 
+	DescribeTable("keeps response parsing scoped to an individual request", func(custom bool) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("X-Request-Id", "request-trace")
+			_, _ = io.WriteString(w, `{"id":9007199254740993}`)
+		}))
+		DeferCleanup(server.Close)
+		writeRequestExecContext("default", server.URL, false)
+		runtime, err := ResolveRuntime("", false, false)
+		Expect(err).NotTo(HaveOccurred())
+		spec := RequestSpec{
+			GatewayName: "bk-demo",
+			Method:      "GET",
+			Path:        "/query",
+			AuthConfig:  &api.AuthRequirements{},
+		}
+		if custom {
+			spec.ResponseParser = func(resp *http.Response) (any, error) {
+				decoder := json.NewDecoder(resp.Body)
+				decoder.UseNumber()
+				var data any
+				err := decoder.Decode(&data)
+				return data, err
+			}
+		}
+		result, err := ExecuteRequest(runtime, spec)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.Envelope.Status).To(Equal(200))
+		Expect(result.Envelope.Headers).To(HaveKeyWithValue("X-Request-Id", "request-trace"))
+		id := result.Envelope.Data.(map[string]any)["id"]
+		if custom {
+			Expect(id).To(Equal(json.Number("9007199254740993")))
+		} else {
+			Expect(id).To(Equal(float64(9007199254740992)))
+		}
+	}, Entry("default parser unchanged", false), Entry("custom parser opt-in", true))
+
+	It("propagates custom response parser failures", func() {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = io.WriteString(w, `{}`)
+		}))
+		DeferCleanup(server.Close)
+		writeRequestExecContext("default", server.URL, false)
+		runtime, err := ResolveRuntime("", false, false)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = ExecuteRequest(runtime, RequestSpec{
+			GatewayName: "bk-demo", Method: "GET", Path: "/query", AuthConfig: &api.AuthRequirements{},
+			ResponseParser: func(_ *http.Response) (any, error) { return nil, errors.New("decode failed") },
+		})
+		expectCLIError(err, "response_error")
+	})
+
 	Describe("helper functions", func() {
 		It("rejects a Content-Type override when a JSON body is present", func() {
 			err := validateUserHeaders(map[string]string{"Content-Type": "text/plain"}, `{"ok":true}`)
